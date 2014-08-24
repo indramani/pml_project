@@ -32,6 +32,8 @@ We will further divide cleandata into two parts,
 *	for training our model =>  trainmodel 
 *	for cross validation   =>  cvmodel.
 
+subset cvmodel is used to compare out of sample errors for different models trained using subset trainmodel. Out of sample errors are captured in accuracy metric of confusionMatrix function which compares out of sample predicted values with given values. Higher accuracy signifies lower out of sample errors.
+
 ```{r message=FALSE}
 require(caret)
 require(randomForest)
