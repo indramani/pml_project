@@ -1,0 +1,89 @@
+### Practical Machine Learning Project
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+## Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## Objective
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. One may use any of the other variables to predict with. One should create a report describing how One built the model, how one used cross validation, what one think the expected out of sample error is, and why one made the choices one did. one will also use the prediction model to predict 20 different test cases. 
+
+
+## Loading and cleaning data
+
+We will load train and test data from corresponding csv files. 
+
+To clean train data, all the columns containing new_window='yes' have been removed as these appear to be meant for summarizing data for certain interval. From remaining data, all the columns containing just NA have been removed. First 8 columns have also been removed as these are related to subject id and other data unrelated to excercise parameters. Data cleaned this way is stored in cleaneddata.
+
+We will further divide cleandata into two parts, 
+*	for training our model =>  trainmodel 
+*	for cross validation   =>  cvmodel.
+
+```{r message=FALSE}
+require(caret)
+require(randomForest)
+```
+```{r }
+traindata <- read.csv("pml-training.csv")
+testdata <- read.csv("pml-testing.csv")
+cleaneddata<-traindata[traindata$new_window=='no',]
+cleaneddata<-cleaneddata[,colSums(is.na(cleaneddata))<nrow(cleaneddata)]
+cleaneddata<-cleaneddata[,8:93]
+inModleTrain<-createDataPartition(y=cleaneddata$classe,p=0.7,list=FALSE)
+trainmodel<-cleaneddata[inModleTrain,]
+cvmodel<-cleaneddata[-inModleTrain,]
+
+```
+
+## Feature selection
+
+We have already reduced number of columns from 160 in original traindata to 86 in cleaned data. However, even 86 features requires enormous computing time and RAM for models such as svmPoly, svmLinear and randomForest. It has been a great struggle for me to realize it. Caret train function would take hours and in the end it will throw some error primarily related to memory allocation. 
+
+Once I realized that memory indeed is an issue even if you have 8GB RAM on your system, I went to forums to see if other people are facing similar issues. And indeed that was the case. And from there I got this idea that I have to reduce feature vector.
+
+The first approach I picked to reduce feature vector is to use only numeric columns in cleaned data. This was a very rough first cut. Features got reduced to 52 and method="svmLinear" gave results within 1-2 minutes with 4-fold trControl. However, its accuracy on test data was only about 78%. I tried method="rf" which gave good accuracy and is described in next section 
+
+```{r}
+
+numericvars <- names(cleaneddata)[sapply(cleaneddata,is.numeric)] 
+trainingvars <- c(numericvars,"classe")
+```
+
+## model selection
+
+After method="svmLinear", I tried method="rf" and method="svmPoly". I am demonstrating code for rf model which I used to predict and submit results for part2 of the project. 
+
+```{r}
+desiredvars<-trainingvars
+trControl = trainControl(method = "cv", number = 4, 
+		allowParallel = TRUE,verboseIter = TRUE)
+ 
+# I have commented training command as it takes lot of time. 
+# If someone wants to reproduce model,
+# following two line should be uncommentd.
+
+#rfFit <- train(classe ~ . , data=trainmodel[,desiredvars], 
+#	method = "rf", trControl = trControl)
+predictrf<-predict(rfFit$finalModel, newdata=cvmodel)
+confRF<-confusionMatrix(data=predictrf,reference=cvmodel$classe)
+confRF
+
+``` 
+
+
+## End Note
+
+Model Generated using this approach gave very good results. Accuracy for cross validation data ( partitioned from given train data ) was 99.7%.  method=svmPoly with 4-fold training gave accuracy of 99.32%. Also all the prediction on test data were correct for rf model. 
